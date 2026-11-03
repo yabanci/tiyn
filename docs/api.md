@@ -113,7 +113,7 @@ Teen: own task. Parent: own task while the link is active. Others: 403 `forbidde
 
 Header `Idempotency-Key` required. Two forms:
 - **Text:** `Content-Type: application/json`, body `{ "text": "…" }`, at most 2000 characters.
-- **Image:** `multipart/form-data` with part `file`, JPEG or PNG only, at most 5 MB (the request limit is 8 MB). The server strips EXIF (including GPS), applies the orientation, and re-encodes. Pixel limit 40 million.
+- **Image:** `multipart/form-data` with part `file`, JPEG or PNG only, at most 5 MB (the request limit is 8 MB). The server strips EXIF (including GPS), applies the orientation, and re-encodes. Pixel limit 16 million.
 
 Only an `ASSIGNED` task before its deadline can be submitted. Errors: 409 `deadline_passed`, 409 `invalid_transition`, 422 `unsupported_proof` (wrong type, too large, empty or over-long text), 422 `invalid_idempotency_key`, 403 `forbidden`, 413 `payload_too_large`, 503 `media_busy`.
 
