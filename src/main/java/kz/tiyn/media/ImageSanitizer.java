@@ -7,6 +7,8 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
@@ -17,12 +19,35 @@ import javax.imageio.stream.ImageOutputStream;
 
 final class ImageSanitizer {
 
-    static final long MAX_PIXELS = 40_000_000L;
+    static final long MAX_PIXELS = 16_000_000L;
+    static final int MAX_CONCURRENT_DECODES = 2;
+    static final long GATE_WAIT_MILLIS = 1_000L;
+    static final Semaphore GATE = new Semaphore(MAX_CONCURRENT_DECODES);
     private static final float JPEG_QUALITY = 0.9f;
 
     private ImageSanitizer() {}
 
     static byte[] strip(String contentType, byte[] bytes) {
+        acquireGate();
+        try {
+            return decodeAndEncode(contentType, bytes);
+        } finally {
+            GATE.release();
+        }
+    }
+
+    private static void acquireGate() {
+        try {
+            if (!GATE.tryAcquire(GATE_WAIT_MILLIS, TimeUnit.MILLISECONDS)) {
+                throw new MediaBusyException();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new MediaBusyException();
+        }
+    }
+
+    private static byte[] decodeAndEncode(String contentType, byte[] bytes) {
         String format = contentType.equals("image/png") ? "png" : "jpeg";
         try (ImageInputStream in = ImageIO.createImageInputStream(new ByteArrayInputStream(bytes))) {
             Iterator<ImageReader> readers = ImageIO.getImageReaders(in);

@@ -115,7 +115,9 @@ Header `Idempotency-Key` required. Two forms:
 - **Text:** `Content-Type: application/json`, body `{ "text": "…" }`, at most 2000 characters.
 - **Image:** `multipart/form-data` with part `file`, JPEG or PNG only, at most 5 MB (the request limit is 8 MB). The server strips EXIF (including GPS), applies the orientation, and re-encodes. Pixel limit 40 million.
 
-Only an `ASSIGNED` task before its deadline can be submitted. Errors: 409 `deadline_passed`, 409 `invalid_transition`, 422 `unsupported_proof` (wrong type, too large, empty or over-long text), 422 `invalid_idempotency_key`, 403 `forbidden`, 413 `payload_too_large`.
+Only an `ASSIGNED` task before its deadline can be submitted. Errors: 409 `deadline_passed`, 409 `invalid_transition`, 422 `unsupported_proof` (wrong type, too large, empty or over-long text), 422 `invalid_idempotency_key`, 403 `forbidden`, 413 `payload_too_large`, 503 `media_busy`.
+
+Proof image limits: JPEG or PNG, at most 5 MB, and at most 16 million pixels (for example 4000x4000); a larger image is 422 `unsupported_proof`. The server decodes at most 2 proof images at a time and an upload waits up to 1 second for a free slot; when none frees up it answers 503 `media_busy` and nothing is stored. Retry with the same `Idempotency-Key` after a short pause.
 
 ### Decisions (parent), all return `TaskResponse`
 

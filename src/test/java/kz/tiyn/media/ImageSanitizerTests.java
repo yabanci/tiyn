@@ -7,6 +7,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.TimeUnit;
 import javax.imageio.ImageIO;
 import kz.tiyn.support.TestImages;
 import org.junit.jupiter.api.Test;
@@ -93,5 +94,68 @@ class ImageSanitizerTests {
     @Test
     void webpIsNoLongerAccepted() {
         assertThatThrownBy(() -> MediaRules.requireAllowedType("image/webp")).isInstanceOf(InvalidMediaException.class);
+    }
+
+    private static byte[] flatPng(int width, int height) throws Exception {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_BYTE_BINARY);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ImageIO.write(image, "png", out);
+        return out.toByteArray();
+    }
+
+    @Test
+    void aTinyPngWithHostileDimensionsIsRejectedBeforeItIsDecoded() throws Exception {
+        byte[] hostile = flatPng(9_000, 9_000);
+        assertThat(hostile.length).isLessThan(MediaRules.MAX_BYTES);
+
+        assertThatThrownBy(() -> ImageSanitizer.strip("image/png", hostile))
+                .isInstanceOf(InvalidMediaException.class)
+                .hasMessage("image too large");
+    }
+
+    @Test
+    void anImageAtThePixelCeilingIsStillAccepted() throws Exception {
+        byte[] atLimit = flatPng(4_000, 4_000);
+
+        BufferedImage image = decode(ImageSanitizer.strip("image/png", atLimit));
+
+        assertThat((long) image.getWidth() * image.getHeight()).isEqualTo(ImageSanitizer.MAX_PIXELS);
+    }
+
+    @Test
+    void exifRotationOnAnImageAtTheCeilingStillSwapsDimensions() throws Exception {
+        byte[] original = withExif(TestImages.jpeg(4_000, 2_000), 8);
+
+        BufferedImage image = decode(ImageSanitizer.strip("image/jpeg", original));
+
+        assertThat(image.getWidth()).isEqualTo(2_000);
+        assertThat(image.getHeight()).isEqualTo(4_000);
+    }
+
+    @Test
+    void whenEveryDecodeSlotIsTakenTheUploadFailsFastAsBusy() throws Exception {
+        ImageSanitizer.GATE.acquire(ImageSanitizer.MAX_CONCURRENT_DECODES);
+        try {
+            long started = System.nanoTime();
+
+            assertThatThrownBy(() -> ImageSanitizer.strip("image/png", TestImages.png(4, 4)))
+                    .isInstanceOf(MediaBusyException.class);
+
+            assertThat(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started))
+                    .isLessThan(ImageSanitizer.GATE_WAIT_MILLIS + 1_000);
+        } finally {
+            ImageSanitizer.GATE.release(ImageSanitizer.MAX_CONCURRENT_DECODES);
+        }
+    }
+
+    @Test
+    void slotsAreReleasedAfterSuccessAndAfterFailure() {
+        for (int i = 0; i < ImageSanitizer.MAX_CONCURRENT_DECODES * 3; i++) {
+            ImageSanitizer.strip("image/png", TestImages.png(4, 4));
+            assertThatThrownBy(() -> ImageSanitizer.strip("image/png", new byte[] {1, 2, 3}))
+                    .isInstanceOf(InvalidMediaException.class);
+        }
+
+        assertThat(ImageSanitizer.GATE.availablePermits()).isEqualTo(ImageSanitizer.MAX_CONCURRENT_DECODES);
     }
 }

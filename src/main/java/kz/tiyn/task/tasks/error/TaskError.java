@@ -17,7 +17,8 @@ public enum TaskError {
     INVALID_IDEMPOTENCY_KEY,
     TEEN_REQUIRED,
     INVALID_FILTER,
-    INVALID_SCHEDULE;
+    INVALID_SCHEDULE,
+    MEDIA_BUSY;
 
     public String code() {
         return name().toLowerCase();

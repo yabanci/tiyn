@@ -34,6 +34,7 @@ class TaskExceptionHandler {
                     TEEN_REQUIRED,
                     INVALID_FILTER,
                     INVALID_SCHEDULE -> HttpStatus.UNPROCESSABLE_ENTITY;
+            case MEDIA_BUSY -> HttpStatus.SERVICE_UNAVAILABLE;
         };
     }
 }

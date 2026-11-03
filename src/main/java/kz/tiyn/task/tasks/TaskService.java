@@ -11,6 +11,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 import kz.tiyn.identity.FamilyDirectory;
 import kz.tiyn.media.InvalidMediaException;
+import kz.tiyn.media.MediaBusyException;
 import kz.tiyn.media.Storage;
 import kz.tiyn.platform.security.Principal;
 import kz.tiyn.platform.security.Role;
@@ -188,6 +189,8 @@ class TaskService {
             return storage.put(taskId.toString(), contentType, body);
         } catch (InvalidMediaException e) {
             throw new TaskException(TaskError.UNSUPPORTED_PROOF);
+        } catch (MediaBusyException e) {
+            throw new TaskException(TaskError.MEDIA_BUSY);
         }
     }
 
